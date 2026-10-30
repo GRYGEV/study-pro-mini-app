@@ -172,7 +172,22 @@ app.post('/telegram-webhook', async (req, res) => {
     return res.sendStatus(200);
   }
 });
+async function initDatabase() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS orders (
+      id BIGSERIAL PRIMARY KEY,
+      order_number TEXT UNIQUE NOT NULL,
+      telegram_id TEXT NOT NULL,
+      service TEXT NOT NULL,
+      customer_name TEXT NOT NULL,
+      details TEXT NOT NULL,
+      deadline TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
 
+  console.log('STUDY PRO database ready');
+}
 app.get('/health', (_, res) => res.send('STUDY PRO is running'));
 
 const port = process.env.PORT || 3000;
