@@ -66,7 +66,19 @@ label{display:block;margin-top:16px;color:#ddd}
 <textarea id="details" placeholder="Что нужно оформить?" required></textarea>
 <label>Желаемый срок</label>
 <input id="deadline" placeholder="Например, к пятнице">
-<button type="submit">Отправить заявку</button>
+
+<div style="margin:16px 0; padding:12px; background:#252b38; border-radius:10px;">
+  <p>Документы STUDY PRO:</p>
+  <p><a href="/offer.html" target="_blank">Публичная оферта</a></p>
+  <p><a href="/privacy.html" target="_blank">Политика конфиденциальности</a></p>
+  <p><a href="/consent.html" target="_blank">Согласие на обработку персональных данных</a></p>
+  <label style="display:flex; gap:10px; align-items:flex-start;">
+    <input type="checkbox" id="consent" required>
+    <span>Я ознакомился с документами и даю согласие на обработку персональных данных.</span>
+  </label>
+</div>
+
+  <button type="submit">Отправить заявку</button>
 </form>
 <p id="result"></p>
 <button onclick="home()">← Назад в каталог</button>
@@ -95,7 +107,8 @@ service:document.getElementById('service').value,
 name:document.getElementById('name').value,
 details:document.getElementById('details').value,
 deadline:document.getElementById('deadline').value,
-initData:tg?.initData||''
+initData:tg?.initData||'',
+consent:document.getElementById('consent').checked
 };
 try{
 const response=await fetch('/api/order',{
