@@ -151,8 +151,16 @@ app.get('/health', (_, res) => res.send('STUDY PRO is running'));
 
 const port = process.env.PORT || 3000;
 
+
 app.listen(port, async () => {
   console.log(`STUDY PRO listening on ${port}`);
+
+  try {
+    await initDatabase();
+    console.log('STUDY PRO database ready');
+  } catch (error) {
+    console.error('Database initialization failed:', error);
+  }
 
   try {
     const response = await fetch(
