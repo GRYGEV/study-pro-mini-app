@@ -1,0 +1,367 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>STUDY PRO — Админ-панель</title>
+<style>
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 20px;
+  min-height: 100vh;
+  font-family: Arial, sans-serif;
+  color: white;
+  background: linear-gradient(145deg, #09091c, #21134d, #101b43);
+}
+
+.container {
+  max-width: 950px;
+  margin: 35px auto;
+}
+
+header { margin-bottom: 30px; }
+
+.logo {
+  font-size: 30px;
+  font-weight: 800;
+  background: linear-gradient(90deg, #a04dff, #398aff);
+  background-clip: text;
+  color: transparent;
+}
+
+.subtitle { color: #aaa; margin-top: 8px; }
+
+.panel {
+  background: rgba(255,255,255,.07);
+  border: 1px solid rgba(255,255,255,.13);
+  border-radius: 20px;
+  padding: 24px;
+  margin-bottom: 20px;
+  backdrop-filter: blur(12px);
+}
+
+h2 { margin-top: 0; }
+
+input, select {
+  width: 100%;
+  padding: 14px;
+  margin: 9px 0;
+  border-radius: 11px;
+  border: 1px solid #51457c;
+  background: #11112c;
+  color: white;
+  font-size: 16px;
+}
+
+button {
+  padding: 13px 18px;
+  border: 0;
+  border-radius: 11px;
+  color: white;
+  font-size: 15px;
+  font-weight: bold;
+  background: linear-gradient(100deg, #9845ff, #398aff);
+  cursor: pointer;
+}
+
+button:disabled { opacity: .5; }
+
+.hidden { display: none; }
+
+#message { color: #ffaaaa; margin-top: 12px; }
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.stat {
+  padding: 18px;
+  border-radius: 14px;
+  background: rgba(130,90,255,.16);
+}
+
+.stat strong {
+  display: block;
+  font-size: 27px;
+  margin-top: 8px;
+}
+
+.order {
+  border: 1px solid #51457c;
+  border-radius: 15px;
+  padding: 17px;
+  margin-top: 14px;
+  background: rgba(10,10,35,.65);
+}
+
+.order-title {
+  font-size: 19px;
+  font-weight: bold;
+  color: #b99aff;
+}
+
+.order p {
+  color: #ddd;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.muted { color: #aaa; font-size: 13px; }
+
+.status-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.status-row select { flex: 1; min-width: 150px; }
+
+#orders { margin-top: 20px; }
+
+@media(max-width: 520px) {
+  body { padding: 12px; }
+  .panel { padding: 17px; }
+  .stats { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<header>
+  <div class="logo">STUDY PRO</div>
+  <div class="subtitle">Панель управления заказами</div>
+</header>
+
+<section class="panel" id="loginPanel">
+  <h2>Вход администратора</h2>
+  <form id="loginForm">
+    <input
+      id="password"
+      type="password"
+      placeholder="Пароль администратора"
+      required
+      autocomplete="current-password"
+    >
+    <button type="submit" id="loginButton">Войти</button>
+  </form>
+  <div id="message"></div>
+</section>
+
+<section id="dashboard" class="hidden">
+
+  <div class="stats">
+    <div class="stat">
+      Всего заказов
+      <strong id="total">0</strong>
+    </div>
+    <div class="stat">
+      Новые
+      <strong id="newCount">0</strong>
+    </div>
+    <div class="stat">
+      В работе
+      <strong id="workCount">0</strong>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Мои заказы</h2>
+
+    <input
+      id="search"
+      type="search"
+      placeholder="Поиск по номеру или имени..."
+    >
+
+    <button id="refreshButton" type="button">Обновить список</button>
+
+    <div id="orders"></div>
+    <div id="ordersMessage" class="muted"></div>
+  </div>
+</section>
+
+</div>
+
+<script>
+const loginPanel = document.getElementById('loginPanel');
+const dashboard = document.getElementById('dashboard');
+const message = document.getElementById('message');
+const ordersBox = document.getElementById('orders');
+const ordersMessage = document.getElementById('ordersMessage');
+
+let allOrders = [];
+
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const button = document.getElementById('loginButton');
+  button.disabled = true;
+  message.textContent = '';
+
+  try {
+    const response = await fetch('/api/admin/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({
+        password: document.getElementById('password').value
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Не удалось войти.');
+    }
+
+    loginPanel.classList.add('hidden');
+    dashboard.classList.remove('hidden');
+    await loadOrders();
+
+  } catch (error) {
+    message.textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+});
+
+async function loadOrders() {
+  ordersMessage.textContent = 'Загружаем заказы...';
+  ordersBox.replaceChildren();
+
+  try {
+    const response = await fetch('/api/admin/orders', {
+      credentials: 'same-origin'
+    });
+
+    if (response.status === 401) {
+      dashboard.classList.add('hidden');
+      loginPanel.classList.remove('hidden');
+      throw new Error('Сессия завершилась. Войди снова.');
+    }
+
+    if (!response.ok) throw new Error('Ошибка загрузки заказов.');
+
+    const data = await response.json();
+    allOrders = data.orders || [];
+
+    document.getElementById('total').textContent = allOrders.length;
+    document.getElementById('newCount').textContent =
+      allOrders.filter(o => o.status === 'Новая').length;
+    document.getElementById('workCount').textContent =
+      allOrders.filter(o => o.status === 'В работе').length;
+
+    renderOrders();
+    ordersMessage.textContent = allOrders.length
+      ? ''
+      : 'Пока заказов нет.';
+
+  } catch (error) {
+    ordersMessage.textContent = error.message;
+  }
+}
+
+function renderOrders() {
+  const query = document.getElementById('search').value.toLowerCase().trim();
+
+  const filtered = allOrders.filter(order =>
+    String(order.order_number).toLowerCase().includes(query) ||
+    String(order.customer_name).toLowerCase().includes(query)
+  );
+
+  ordersBox.replaceChildren();
+
+  filtered.forEach(order => {
+    const card = document.createElement('div');
+    card.className = 'order';
+
+    const title = document.createElement('div');
+    title.className = 'order-title';
+    title.textContent = order.order_number;
+
+    const service = document.createElement('p');
+    service.textContent = 'Услуга: ' + order.service;
+
+    const name = document.createElement('p');
+    name.textContent = 'Имя: ' + order.customer_name;
+
+    const details = document.createElement('p');
+    details.textContent = 'Описание: ' + order.details;
+
+    const deadline = document.createElement('p');
+    deadline.textContent = 'Срок: ' + (order.deadline || 'Не указан');
+
+    const created = document.createElement('p');
+    created.className = 'muted';
+    created.textContent = 'Создан: ' +
+      new Date(order.created_at).toLocaleString('ru-RU');
+
+    const row = document.createElement('div');
+    row.className = 'status-row';
+
+    const select = document.createElement('select');
+
+    ['Новая', 'В работе', 'Готово', 'Отправлено'].forEach(status => {
+      const option = document.createElement('option');
+      option.value = status;
+      option.textContent = status;
+      option.selected = status === order.status;
+      select.appendChild(option);
+    });
+
+    const save = document.createElement('button');
+    save.type = 'button';
+    save.textContent = 'Сохранить';
+
+    save.addEventListener('click', async () => {
+      save.disabled = true;
+
+      try {
+        const response = await fetch(
+          '/api/admin/orders/' + encodeURIComponent(order.id) + '/status',
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ status: select.value })
+          }
+        );
+
+        if (!response.ok) throw new Error('Не удалось изменить статус.');
+
+        await loadOrders();
+
+      } catch (error) {
+        alert(error.message);
+      } finally {
+        save.disabled = false;
+      }
+    });
+
+    row.append(select, save);
+    card.append(title, service, name, details, deadline, created, row);
+    ordersBox.appendChild(card);
+  });
+
+  if (!filtered.length) {
+    ordersMessage.textContent = 'Ничего не найдено.';
+  } else {
+    ordersMessage.textContent = '';
+  }
+}
+
+document.getElementById('search').addEventListener('input', renderOrders);
+document.getElementById('refreshButton').addEventListener('click', loadOrders);
+</script>
+</body>
+</html>
