@@ -75,6 +75,96 @@ app.post('/api/order', async (req, res) => {
 });
 
 
-app.get('/health', (_,res)=>res.send('STUDY PRO is running'));
+app.post('/telegram-webhook', async (req, res) => {
+  try {
+    const secret = req.get('X-Telegram-Bot-Api-Secret-Token');
+
+    if (!process.env.WEBHOOK_SECRET ||
+        secret !== process.env.WEBHOOK_SECRET) {
+      return res.sendStatus(403);
+    }
+
+    const message = req.body?.message;
+
+    if (!message ||
+        String(message.chat?.id) !== String(process.env.ADMIN_CHAT_ID)) {
+      return res.sendStatus(200);
+    }
+
+    if (!message.document) return res.sendStatus(200);
+
+    const originalText = message.reply_to_message?.text || '';
+    const match = originalText.match(/Telegram ID:\s*(\d+)/);
+
+    if (!match) {
+      await fetch(`https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: process.env.ADMIN_CHAT_ID,
+          text: 'Не удалось найти Telegram ID. Ответь именно на уведомление о заявке.'
+        })
+      });
+      return res.sendStatus(200);
+    }
+
+    const customerId = match[1];
+
+    const sent = await fetch(`https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendDocument`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: customerId,
+        document: message.document.file_id,
+        caption: '📎 Ваш готовый файл от STUDY PRO!'
+      })
+    });
+
+    const result = await sent.json();
+
+    await fetch(`https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: process.env.ADMIN_CHAT_ID,
+        text: result.ok
+          ? '✅ Файл отправлен клиенту!'
+          : '❌ Не удалось отправить файл клиенту. Проверь, что клиент запускал бота.'
+      })
+    });
+
+    return res.sendStatus(200);
+  } catch (error) {
+    console.error(error);
+    return res.sendStatus(200);
+  }
+});
+
+app.get('/health', (_, res) => res.send('STUDY PRO is running'));
+
 const port = process.env.PORT || 3000;
-app.listen(port, ()=>console.log(`STUDY PRO listening on ${port}`));
+
+app.listen(port, async () => {
+  console.log(`STUDY PRO listening on ${port}`);
+
+  try {
+    const response = await fetch(
+      `https://api.telegram.org/bot${process.env.BOT_TOKEN}/setWebhook`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: 'https://study-pro-mini-app.onrender.com/telegram-webhook',
+          secret_token: process.env.WEBHOOK_SECRET,
+          allowed_updates: ['message']
+        })
+      }
+    );
+
+    const result = await response.json();
+    console.log('Webhook setup:', result.ok ? 'success' : result.description);
+  } catch (error) {
+    console.error('Webhook setup failed:', error);
+  }
+});
+
