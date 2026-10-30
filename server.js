@@ -204,7 +204,7 @@ app.post('/api/order', async (req, res) => {
     }
 
     if (![service, name, details].every(x => typeof x === 'string' && x.trim()) ||
-        [service, name, details, deadline, contact].some(x => typeof x !== 'string' || x.length > 1500)) {
+        [service, name, details, deadline].some(x => typeof x !== 'string' || x.length > 1500)) {
       return res.status(400).json({ error: 'Проверь заполнение полей.' });
     }
 
