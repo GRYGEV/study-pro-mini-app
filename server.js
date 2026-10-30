@@ -172,6 +172,7 @@ app.post('/telegram-webhook', async (req, res) => {
     return res.sendStatus(200);
   }
 });
+
 async function initDatabase() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS orders (
@@ -185,6 +186,16 @@ async function initDatabase() {
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `);
+
+  // Добавляем колонку со статусом заказа
+  await pool.query(`
+    ALTER TABLE orders
+    ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'Новая'
+  `);
+
+  console.log('STUDY PRO database ready');
+}
+
 
   console.log('STUDY PRO database ready');
 }
