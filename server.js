@@ -1,7 +1,14 @@
 const express = require('express');
 const crypto = require('crypto');
 const path = require('path');
+const { Pool } = require('pg');
 
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL
+    ? { rejectUnauthorized: false }
+    : false
+});
 const app = express();
 app.use(express.json({ limit: '30kb' }));
 app.use(express.static(path.join(__dirname, 'public')));
