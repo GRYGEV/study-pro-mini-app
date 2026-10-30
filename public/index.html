@@ -1,0 +1,116 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#11102a">
+<title>STUDY PRO</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;padding:20px;background:#0b0b1c;color:white;font-family:Arial,sans-serif}
+.wrap{max-width:600px;margin:auto}
+.brand{font-size:24px;font-weight:bold;margin-bottom:30px}
+.brand span{color:#bd72ff}
+.hero,.card{background:linear-gradient(135deg,#25145a,#171b46);padding:22px;border-radius:22px;margin-bottom:18px}
+h1{font-size:29px}
+p{color:#c8c1df;line-height:1.5}
+h2{font-size:20px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.service{background:#191735;border:1px solid #40366c;border-radius:16px;padding:16px}
+.service b{display:block;margin:10px 0}
+.price{color:#d49cff;font-weight:bold}
+button{width:100%;padding:16px;border:0;border-radius:14px;background:linear-gradient(100deg,#9348ff,#398cff);color:white;font-size:16px;font-weight:bold;margin-top:14px}
+input,textarea,select{width:100%;padding:13px;margin-top:8px;border-radius:10px;border:1px solid #514879;background:#11102a;color:white;font-size:15px}
+label{display:block;margin-top:16px;color:#ddd}
+.hidden{display:none}
+.note{font-size:12px;color:#aaa}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="brand">✦ STUDY <span>PRO</span></div>
+
+<section id="home">
+<div class="hero">
+<h1>Привет! 👋</h1>
+<p>Добро пожаловать в STUDY PRO — твой помощник в оформлении учебных материалов.</p>
+</div>
+
+<h2>📚 Каталог услуг</h2>
+<div class="grid">
+<div class="service">📊<b>Презентации</b><span class="price">от 500 ₽</span></div>
+<div class="service">📄<b>Доклады</b><span class="price">от 400 ₽</span></div>
+<div class="service">📝<b>Конспекты</b><span class="price">от 300 ₽</span></div>
+<div class="service">🎨<b>Оформление</b><span class="price">от 300 ₽</span></div>
+</div>
+<button onclick="order()">🛒 Оставить заявку</button>
+</section>
+
+<section id="form" class="hidden">
+<div class="card">
+<h2>Новая заявка 📝</h2>
+<form id="orderForm">
+<label>Выбери услугу</label>
+<select id="service" required>
+<option value="">Выбрать</option>
+<option>Презентация</option>
+<option>Доклад или реферат</option>
+<option>Конспект</option>
+<option>Оформление документов</option>
+</select>
+<label>Как к тебе обращаться?</label>
+<input id="name" placeholder="Твоё имя" required>
+<label>Опиши задачу</label>
+<textarea id="details" placeholder="Что нужно оформить?" required></textarea>
+<label>Желаемый срок</label>
+<input id="deadline" placeholder="Например, к пятнице">
+<button type="submit">Отправить заявку</button>
+</form>
+<p id="result"></p>
+<button onclick="home()">← Назад в каталог</button>
+</div>
+</section>
+
+<p class="note">STUDY PRO · Учись с комфортом 💜</p>
+</div>
+
+<script>
+const tg=window.Telegram?.WebApp;
+if(tg){tg.ready();tg.expand()}
+function order(){
+document.getElementById('home').classList.add('hidden');
+document.getElementById('form').classList.remove('hidden');
+}
+function home(){
+document.getElementById('form').classList.add('hidden');
+document.getElementById('home').classList.remove('hidden');
+}
+document.getElementById('orderForm').addEventListener('submit',async e=>{
+e.preventDefault();
+const result=document.getElementById('result');
+const data={
+service:document.getElementById('service').value,
+name:document.getElementById('name').value,
+details:document.getElementById('details').value,
+deadline:document.getElementById('deadline').value,
+initData:tg?.initData||''
+};
+try{
+const response=await fetch('/api/order',{
+method:'POST',
+headers:{'Content-Type':'application/json'},
+body:JSON.stringify(data)
+});
+const answer=await response.json();
+if(!response.ok)throw new Error(answer.error||'Ошибка');
+result.textContent='Заявка отправлена! 💜';
+e.target.reset();
+}catch(error){
+result.textContent=error.message;
+}
+});
+</script>
+</body>
+</html>
