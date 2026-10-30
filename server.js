@@ -44,22 +44,48 @@ app.post('/api/order', async (req, res) => {
       return res.status(400).json({ error: 'Проверь заполнение полей.' });
     }
 
-    const userData = new URLSearchParams(initData).get('user');
-    let telegramId = '';
+    
+const userData = new URLSearchParams(initData).get('user');
+let telegramId = '';
 
-    try {
-      telegramId = String(JSON.parse(userData || '{}').id || '');
-    } catch (e) {}
+try {
+  telegramId = String(JSON.parse(userData || '{}').id || '');
+} catch (e) {}
 
-    const text = [
-      '📩 Новая заявка STUDY PRO',
-      `Услуга: ${service.trim()}`,
-      `Имя: ${name.trim()}`,
-      `Описание: ${details.trim()}`,
-      `Срок: ${deadline.trim() || 'не указан'}`,
-      `Контакт: ${contact.trim() || 'не указан'}`,
-      `Telegram ID: ${telegramId || 'не получен'}`
-    ].join('\n');
+if (!telegramId) {
+  return res.status(400).json({ error: 'Не удалось получить Telegram ID.' });
+}
+
+
+const orderResult = await pool.query(
+  `WITH next_id AS (
+     SELECT nextval('orders_id_seq') AS id
+   )
+   INSERT INTO orders
+     (id, order_number, telegram_id, service, customer_name, details, deadline)
+   SELECT
+     id,
+     'SP-' || LPAD(id::text, 4, '0'),
+     $1, $2, $3, $4, $5
+   FROM next_id
+   RETURNING order_number`,
+  [telegramId, service.trim(), name.trim(), details.trim(), deadline.trim()]
+);
+
+
+const orderNumber = orderResult.rows[0].order_number;
+
+const text = [
+  '📩 Новая заявка STUDY PRO',
+  `Заказ: ${orderNumber}`,
+  `Услуга: ${service.trim()}`,
+  `Имя: ${name.trim()}`,
+  `Описание: ${details.trim()}`,
+  `Срок: ${deadline.trim() || 'не указан'}`,
+  `Контакт: ${contact.trim() || 'не указан'}`,
+  `Telegram ID: ${telegramId}`
+].join('\n');
+
 
     const response = await fetch(`https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendMessage`, {
       method: 'POST',
