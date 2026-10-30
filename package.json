@@ -1,0 +1,9 @@
+{
+  "name": "study-pro-mini-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Telegram Mini App starter for STUDY PRO",
+  "main": "server.js",
+  "scripts": {"start": "node server.js"},
+  "dependencies": {"express": "^4.21.2"}
+}
