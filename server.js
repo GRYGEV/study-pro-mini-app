@@ -29,6 +29,104 @@ function validateTelegramInitData(initData) {
 }
 
 
+
+function adminToken(timestamp) {
+  return crypto
+    .createHmac('sha256', process.env.ADMIN_PASSWORD)
+    .update(timestamp)
+    .digest('hex');
+}
+
+function isAdmin(req) {
+  const cookie = req.headers.cookie || '';
+  const match = cookie.match(/(?:^|;\s*)sp_admin=(\d+)\.([a-f0-9]+)/);
+
+  if (!match) return false;
+
+  const timestamp = match[1];
+  const signature = match[2];
+
+  if (Date.now() - Number(timestamp) > 12 * 60 * 60 * 1000) {
+    return false;
+  }
+
+  const expected = adminToken(timestamp);
+  const a = Buffer.from(signature);
+  const b = Buffer.from(expected);
+
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+app.post('/api/admin/login', (req, res) => {
+  const password = req.body?.password || '';
+  const savedPassword = process.env.ADMIN_PASSWORD || '';
+
+  if (!savedPassword) {
+    return res.status(500).json({ error: 'Пароль администратора не настроен.' });
+  }
+
+  const a = Buffer.from(String(password));
+  const b = Buffer.from(savedPassword);
+
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    return res.status(401).json({ error: 'Неверный пароль.' });
+  }
+
+  const timestamp = String(Date.now());
+  const signature = adminToken(timestamp);
+
+  res.setHeader(
+    'Set-Cookie',
+    `sp_admin=${timestamp}.${signature}; HttpOnly; Secure; SameSite=Strict; Path=/api/admin; Max-Age=43200`
+  );
+
+  res.json({ ok: true });
+});
+
+app.get('/api/admin/orders', async (req, res) => {
+  if (!isAdmin(req)) return res.sendStatus(401);
+
+  try {
+    const result = await pool.query(`
+      SELECT id, order_number, service, customer_name,
+             details, deadline, status, created_at
+      FROM orders
+      ORDER BY created_at DESC
+    `);
+
+    res.json({ orders: result.rows });
+  } catch (error) {
+    console.error('Admin orders error:', error);
+    res.status(500).json({ error: 'Не удалось загрузить заказы.' });
+  }
+});
+
+app.patch('/api/admin/orders/:id/status', async (req, res) => {
+  if (!isAdmin(req)) return res.sendStatus(401);
+
+  const allowedStatuses = ['Новая', 'В работе', 'Готово', 'Отправлено'];
+  const { status } = req.body || {};
+
+  if (!allowedStatuses.includes(status)) {
+    return res.status(400).json({ error: 'Недопустимый статус.' });
+  }
+
+  try {
+    const result = await pool.query(
+      'UPDATE orders SET status = $1 WHERE id = $2 RETURNING id, status',
+      [status, req.params.id]
+    );
+
+    if (!result.rowCount) {
+      return res.status(404).json({ error: 'Заказ не найден.' });
+    }
+
+    res.json({ ok: true, order: result.rows[0] });
+  } catch (error) {
+    console.error('Admin status error:', error);
+    res.status(500).json({ error: 'Не удалось изменить статус.' });
+  }
+});
 app.post('/api/order', async (req, res) => {
   try {
     const { service, name, details, deadline = '', contact = '', initData = '' } = req.body || {};
