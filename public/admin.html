@@ -176,12 +176,19 @@ button:disabled { opacity: .5; }
 
   <div class="panel">
     <h2>Мои заказы</h2>
-
+<button id="logoutButton" type="button">Выйти из панели</button>
     <input
       id="search"
       type="search"
       placeholder="Поиск по номеру или имени..."
     >
+    <select id="statusFilter">
+  <option value="Все">Все статусы</option>
+  <option value="Новая">Новая</option>
+  <option value="В работе">В работе</option>
+  <option value="Готово">Готово</option>
+  <option value="Отправлено">Отправлено</option>
+</select>
 
     <button id="refreshButton" type="button">Обновить список</button>
 
@@ -272,12 +279,21 @@ async function loadOrders() {
 }
 
 function renderOrders() {
+  
   const query = document.getElementById('search').value.toLowerCase().trim();
+  const selectedStatus = document.getElementById('statusFilter').value;
 
-  const filtered = allOrders.filter(order =>
-    String(order.order_number).toLowerCase().includes(query) ||
-    String(order.customer_name).toLowerCase().includes(query)
-  );
+  const filtered = allOrders.filter(order => {
+    const matchesSearch =
+      String(order.order_number).toLowerCase().includes(query) ||
+      String(order.customer_name).toLowerCase().includes(query);
+
+    const matchesStatus =
+      selectedStatus === 'Все' || order.status === selectedStatus;
+
+    return matchesSearch && matchesStatus;
+  });
+
 
   ordersBox.replaceChildren();
 
@@ -348,9 +364,40 @@ function renderOrders() {
       }
     });
 
-    row.append(select, save);
-    card.append(title, service, name, details, deadline, created, row);
-    ordersBox.appendChild(card);
+    
+const deleteButton = document.createElement('button');
+deleteButton.type = 'button';
+deleteButton.textContent = 'Удалить';
+deleteButton.style.background = 'linear-gradient(100deg, #d83b75, #9b2455)';
+
+deleteButton.addEventListener('click', async () => {
+  if (!confirm('Удалить заказ ' + order.order_number + '?')) return;
+
+  deleteButton.disabled = true;
+
+  try {
+    const response = await fetch(
+      '/api/admin/orders/' + encodeURIComponent(order.id),
+      {
+        method: 'DELETE',
+        credentials: 'same-origin'
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error('Не удалось удалить заказ.');
+    }
+
+    await loadOrders();
+  } catch (error) {
+    alert(error.message);
+    deleteButton.disabled = false;
+  }
+});
+
+row.append(select, save);
+card.append(title, service, name, details, deadline, created, row, deleteButton);
+ordersBox.appendChild(card);
   });
 
   if (!filtered.length) {
@@ -362,6 +409,23 @@ function renderOrders() {
 
 document.getElementById('search').addEventListener('input', renderOrders);
 document.getElementById('refreshButton').addEventListener('click', loadOrders);
+  document.getElementById('logoutButton').addEventListener('click', async () => {
+  try {
+    const response = await fetch('/api/admin/logout', {
+      method: 'POST',
+      credentials: 'same-origin'
+    });
+
+    if (!response.ok) throw new Error('Не удалось выйти.');
+
+    dashboard.classList.add('hidden');
+    loginPanel.classList.remove('hidden');
+    document.getElementById('password').value = '';
+    message.textContent = '';
+  } catch (error) {
+    alert(error.message);
+  }
+});
 </script>
 </body>
 </html>
