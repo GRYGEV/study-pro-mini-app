@@ -250,7 +250,6 @@ const text = [
   `Имя: ${name.trim()}`,
   `Описание: ${details.trim()}`,
   `Срок: ${deadline.trim() || 'не указан'}`,
-  `Контакт: ${contact.trim() || 'не указан'}`,
   `Telegram ID: ${telegramId}`
 ].join('\n');
 
