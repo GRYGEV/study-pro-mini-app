@@ -293,10 +293,6 @@ async function initDatabase() {
 
   console.log('STUDY PRO database ready');
 }
-
-
-  console.log('STUDY PRO database ready');
-}
 app.get('/health', (_, res) => res.send('STUDY PRO is running'));
 
 const port = process.env.PORT || 3000;
