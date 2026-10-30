@@ -83,6 +83,13 @@ app.post('/api/admin/login', (req, res) => {
   res.json({ ok: true });
 });
 
+app.post('/api/admin/logout', (req, res) => {
+  res.setHeader(
+    'Set-Cookie',
+    'sp_admin=; HttpOnly; Secure; SameSite=Strict; Path=/api/admin; Max-Age=0'
+  );
+  res.json({ ok: true });
+});
 app.get('/api/admin/orders', async (req, res) => {
   if (!isAdmin(req)) return res.sendStatus(401);
 
@@ -101,6 +108,7 @@ app.get('/api/admin/orders', async (req, res) => {
   }
 });
 
+
 app.patch('/api/admin/orders/:id/status', async (req, res) => {
   if (!isAdmin(req)) return res.sendStatus(401);
 
@@ -113,7 +121,10 @@ app.patch('/api/admin/orders/:id/status', async (req, res) => {
 
   try {
     const result = await pool.query(
-      'UPDATE orders SET status = $1 WHERE id = $2 RETURNING id, status',
+      `UPDATE orders
+       SET status = $1
+       WHERE id = $2
+       RETURNING id, order_number, status, telegram_id`,
       [status, req.params.id]
     );
 
@@ -121,12 +132,67 @@ app.patch('/api/admin/orders/:id/status', async (req, res) => {
       return res.status(404).json({ error: 'Заказ не найден.' });
     }
 
-    res.json({ ok: true, order: result.rows[0] });
+    const order = result.rows[0];
+    let notificationSent = false;
+
+    try {
+      const response = await fetch(
+        `https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendMessage`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: order.telegram_id,
+            text: [
+              '📦 Обновление заказа STUDY PRO',
+              `Заказ: ${order.order_number}`,
+              `Новый статус: ${order.status}`
+            ].join('\n')
+          })
+        }
+      );
+
+      const telegramResult = await response.json();
+      notificationSent = telegramResult.ok === true;
+    } catch (telegramError) {
+      console.error('Customer notification error:', telegramError);
+    }
+
+    res.json({
+      ok: true,
+      order: {
+        id: order.id,
+        order_number: order.order_number,
+        status: order.status
+      },
+      notificationSent
+    });
   } catch (error) {
     console.error('Admin status error:', error);
     res.status(500).json({ error: 'Не удалось изменить статус.' });
   }
 });
+
+app.delete('/api/admin/orders/:id', async (req, res) => {
+  if (!isAdmin(req)) return res.sendStatus(401);
+
+  try {
+    const result = await pool.query(
+      'DELETE FROM orders WHERE id = $1 RETURNING id',
+      [req.params.id]
+    );
+
+    if (!result.rowCount) {
+      return res.status(404).json({ error: 'Заказ не найден.' });
+    }
+
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('Delete order error:', error);
+    res.status(500).json({ error: 'Не удалось удалить заказ.' });
+  }
+});
+
 app.post('/api/order', async (req, res) => {
   try {
     const { service, name, details, deadline = '', contact = '', initData = '' } = req.body || {};
