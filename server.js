@@ -28,15 +28,22 @@ app.post('/api/order', async (req,res) => {
       [service,name,details,deadline,contact].some(x => typeof x !== 'string' || x.length > 1500)) {
     return res.status(400).json({error:'Проверь заполнение полей.'});
   }
-  const text = [
-    '📩 Новая заявка STUDY PRO',
-    `Услуга: ${service.trim()}`,
-    `Имя: ${name.trim()}`,
-    `Описание: ${details.trim()}`,
-    `Срок: ${deadline.trim() || 'не указан'}`,
-    `Контакт: ${contact.trim() || 'не указан'}`
-  ].join('\n');
-  try {
+  const userData = new URLSearchParams(initData).get('user');
+let telegramId = '';
+
+try {
+  telegramId = String(JSON.parse(userData || '{}').id || '');
+} catch (e) {}
+
+const text = [
+  '📩 Новая заявка STUDY PRO',
+  `Услуга: ${service.trim()}`,
+  `Имя: ${name.trim()}`,
+  `Описание: ${details.trim()}`,
+  `Срок: ${deadline.trim() || 'не указан'}`,
+  `Контакт: ${contact.trim() || 'не указан'}`,
+  `Telegram ID: ${telegramId || 'не получен'}`
+].join('\n');
     const response = await fetch(`https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendMessage`, {
       method:'POST', headers:{'Content-Type':'application/json'},
       body:JSON.stringify({chat_id:process.env.ADMIN_CHAT_ID,text})
