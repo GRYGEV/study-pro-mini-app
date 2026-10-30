@@ -195,7 +195,7 @@ app.delete('/api/admin/orders/:id', async (req, res) => {
 
 app.post('/api/order', async (req, res) => {
   try {
-    const { service, name, details, deadline = '', contact = '', initData = '' } = req.body || {};
+    const { service, name, details, deadline = '', initData, consent } = req.body;
 
     if (!validateTelegramInitData(initData)) {
       return res.status(401).json({
@@ -219,7 +219,11 @@ try {
 if (!telegramId) {
   return res.status(400).json({ error: 'Не удалось получить Telegram ID.' });
 }
-
+if (consent !== true) {
+  return res.status(400).json({
+    error: 'Необходимо дать согласие на обработку персональных данных.'
+  });
+}
 
 const orderResult = await pool.query(
   `WITH next_id AS (
